@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AICO API テストクライアント</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .tabs {
+            display: flex;
+            margin-bottom: 20px;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .tab {
+            flex: 1;
+            padding: 15px;
+            text-align: center;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.3s ease;
+        }
+
+        .tab.active {
+            border-bottom-color: #4f46e5;
+            color: #4f46e5;
+        }
+
+        .container {
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #374151;
+        }
+
+        input[type="text"],
+        input[type="file"],
+        textarea,
+        select {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        button {
+            background-color: #4f46e5;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.3s ease;
+        }
+
+        button:hover {
+            background-color: #4338ca;
+        }
+
+        button:disabled {
+            background-color: #9ca3af;
+            cursor: not-allowed;
+        }
+
+        .status {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 6px;
+            display: none;
+        }
+
+        .status.visible {
+            display: block;
+        }
+
+        .status.success {
+            background-color: #dcfce7;
+            color: #166534;
+        }
+
+        .status.error {
+            background-color: #fee2e2;
+            color: #991b1b;
+        }
+
+        .message {
+            margin-bottom: 10px;
+            padding: 10px;
+            background-color: #f3f4f6;
+            border-radius: 6px;
+        }
+
+        .message.error {
+            background-color: #fee2e2;
+            color: #991b1b;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #ffffff;
+            border-radius: 50%;
+            border-top-color: transparent;
+            animation: spin 1s linear infinite;
+            margin-right: 8px;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .greeting {
+            margin-top: 15px;
+            padding: 15px;
+            background-color: #f0f9ff;
+            border: 1px solid #bae6fd;
+            border-radius: 6px;
+            color: #0369a1;
+            display: none;
+        }
+
+        .greeting.visible {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <h1>AICO API テストクライアント</h1>
+
+    <div class="tabs">
+        <div class="tab active" data-tab="conversation">会話ログ送信</div>
+        <div class="tab" data-tab="polling">ポーリング</div>
+        <div class="tab" data-tab="sse">強制発話受信</div>
+    </div>
+
+    <div class="container" id="conversationTab">
+        <h2>会話ログ送信</h2>
+        <form id="messageForm">
+            <div class="form-group">
+                <label for="aicoId">AICO ID:</label>
+                <input type="text" id="aicoId" required placeholder="例: aico001">
+            </div>
+
+            <div class="form-group">
+                <label for="messageId">メッセージID:</label>
+                <input type="text" id="messageId" required>
+            </div>
+
+            <div class="form-group">
+                <label for="message">メッセージ:</label>
+                <textarea id="message" rows="3" required></textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="speaker">発話者:</label>
+                <select id="speaker" required>
+                    <option value="USER">ユーザー</option>
+                    <option value="AICO">AICO</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="photo">写真添付 (オプション):</label>
+                <input type="file" id="photo" accept="image/*">
+            </div>
+
+            <button type="submit" id="submitButton">送信</button>
+        </form>
+
+        <div id="messageResponse" class="status"></div>
+        <div id="mediaUrlDisplay"></div>
+    </div>
+
+    <div class="container" id="pollingTab" style="display: none;">
+        <h2>ポーリング</h2>
+        <div class="form-group">
+            <label for="pollingAicoId">AICO ID:</label>
+            <input type="text" id="pollingAicoId" required placeholder="例: aico001">
+        </div>
+
+        <button id="startPolling">ポーリング開始</button>
+        <button id="stopPolling" style="display: none;">ポーリング停止</button>
+
+        <div id="pollingStatus" class="status"></div>
+        <div id="greetingMessage" class="greeting"></div>
+    </div>
+
+    <div class="container" id="sseTab" style="display: none;">
+        <h2>強制発話受信</h2>
+        <div class="form-group">
+            <label for="sseAicoId">AICO ID:</label>
+            <input type="text" id="sseAicoId" required placeholder="例: aico001">
+        </div>
+
+        <button id="startSSE">接続開始</button>
+        <button id="stopSSE" style="display: none;">接続停止</button>
+
+        <h3>受信メッセージ:</h3>
+        <div id="forcedMessages"></div>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:3000/api';
+        let pollingInterval;
+        let eventSource;
+        let tokenRefreshInterval;
+
+        // ユーティリティ関数
+        async function fetchWithTimeout(url, options = {}, timeout = 5000) {
+            const controller = new AbortController();
+            const id = setTimeout(() => controller.abort(), timeout);
+            const response = await fetch(url, {
+                ...options,
+                signal: controller.signal
+            });
+            clearTimeout(id);
+            return response;
+        }
+
+        async function authenticate() {
+            try {
+                const response = await fetchWithTimeout(`${API_URL}/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        username: 'admin',
+                        password: 'admin123'
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error('認証に失敗しました');
+                }
+
+                const data = await response.json();
+                localStorage.setItem('auth_token', data.token);
+                console.log('Authentication successful');
+            } catch (error) {
+                console.error('Authentication error:', error);
+                throw error;
+            }
+        }
+
+        // 端末ID取得関数
+        async function getTerminalId(aicoId) {
+            try {
+                const token = localStorage.getItem('auth_token');
+                if (!token) {
+                    throw new Error('認証トークンがありません');
+                }
+
+                const response = await fetchWithTimeout(`${API_URL}/terminals`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error('端末情報の取得に失敗しました');
+                }
+
+                const terminals = await response.json();
+                const terminal = terminals.find(t => t.aicoId === aicoId);
+
+                if (!terminal) {
+                    throw new Error('指定されたAICO IDの端末が見つかりません');
+                }
+
+                return terminal.id;
+            } catch (error) {
+                console.error('Terminal lookup error:', error);
+                throw error;
+            }
+        }
+
+        // SSE管理クラス
+        class SSEManager {
+            constructor(terminalId) {
+                this.terminalId = terminalId;
+                this.eventSource = null;
+                this.retryCount = 0;
+                this.maxRetries = 3;
+                this.retryInterval = 5000;
+            }
+
+            connect() {
+                if (this.eventSource) {
+                    this.eventSource.close();
+                }
+
+                const token = localStorage.getItem('auth_token');
+                if (!token) {
+                    throw new Error('認証トークンがありません');
+                }
+
+                const url = new URL(`${API_URL}/sse/${this.terminalId}`);
+                url.searchParams.append('token', token);
+
+                this.eventSource = new EventSource(url.toString());
+                
+                this.eventSource.onmessage = this.handleMessage.bind(this);
+                this.eventSource.onerror = this.handleError.bind(this);
+                this.eventSource.onopen = () => {
+                    this.retryCount = 0;
+                    console.log('SSE connection established');
+                    this.addMessage('接続が確立されました');
+                };
+            }
+
+            handleMessage(event) {
+                try {
+                    const data = JSON.parse(event.data);
+                    this.addMessage(`${new Date().toLocaleTimeString()}: ${data.message || JSON.stringify(data)}`);
+                } catch (error) {
+                    console.error('Failed to parse SSE message:', error);
+                    this.addMessage(`エラー: メッセージの解析に失敗しました - ${event.data}`);
+                }
+            }
+
+            handleError(error) {
+                console.error('SSE error:', error);
+                this.addMessage('接続エラーが発生しました', true);
+
+                if (this.retryCount < this.maxRetries) {
+                    this.retryCount++;
+                    setTimeout(() => this.connect(), this.retryInterval);
+                    this.addMessage(`再接続を試みています (${this.retryCount}/${this.maxRetries})`);
+                } else {
+                    this.addMessage('接続を終了します - 最大再試行回数に達しました');
+                    this.close();
+                }
+            }
+
+            addMessage(message, isError = false) {
+                const messageDiv = document.createElement('div');
+                messageDiv.className = `message${isError ? ' error' : ''}`;
+                messageDiv.textContent = message;
+                const messagesContainer = document.getElementById('forcedMessages');
+                messagesContainer.insertBefore(messageDiv, messagesContainer.firstChild);
+            }
+
+            close() {
+                if (this.eventSource) {
+                    this.eventSource.close();
+                    this.eventSource = null;
+                    this.addMessage('接続を終了しました');
+                }
+            }
+        }
+
+        // UI関連の関数
+        function showStatus(elementId, message, isSuccess) {
+            const element = document.getElementById(elementId);
+            element.className = `status ${isSuccess ? 'success' : 'error'} visible`;
+            element.textContent = message;
+        }
+
+        function showGreeting(message) {
+            const element = document.getElementById('greetingMessage');
+            if (message) {
+                element.textContent = `あいさつ: ${message}`;
+                element.classList.add('visible');
+            } else {
+                element.textContent = '';
+                element.classList.remove('visible');
+            }
+        }
+
+        // イベントリスナーの設定
+        document.addEventListener('DOMContentLoaded', () => {
+            // タブ切り替え
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.addEventListener('click', () => {
+                    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                    tab.classList.add('active');
+                    
+                    document.querySelectorAll('.container').forEach(container => {
+                        container.style.display = 'none';
+                    });
+                    document.getElementById(`${tab.dataset.tab}Tab`).style.display = 'block';
+                });
+            });
+
+            // メッセージ送信フォーム
+            document.getElementById('messageForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                
+                const aicoId = document.getElementById('aicoId').value;
+                const messageId = document.getElementById('messageId').value;
+                const message = document.getElementById('message').value;
+                const speaker = document.getElementById('speaker').value;
+                const photo = document.getElementById('photo').files[0];
+                const submitButton = document.getElementById('submitButton');
+
+                if (!aicoId || !messageId || !message || !speaker) {
+                    showStatus('messageResponse', '必須フィールドを入力してください', false);
+                    return;
+                }
+
+                try {
+                    submitButton.disabled = true;
+                    submitButton.innerHTML = '<span class="loading"></span>送信中...';
+
+                    const terminalId = await getTerminalId(aicoId);
+                    const formData = new FormData();
+                    formData.append('message_id', messageId);
+                    formData.append('message', message);
+                    formData.append('speaker', speaker);
+                    
+                    if (photo) {
+                        formData.append('file', photo);
+                    }
+
+                    const token = localStorage.getItem('auth_token');
+                    const response = await fetch(`${API_URL}/terminals/${terminalId}/message`, {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${token}`
+                        },
+                        body: formData
+                    });
+
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.message || 'メッセージの送信に失敗しました');
+                    }
+
+                    const data = await response.json();
+                    showStatus('messageResponse', '送信成功', true);
+
+                    if (data.mediaUrl) {
+                        document.getElementById('mediaUrlDisplay').innerHTML = `
+                            <div class="status success visible">
+                                <p>メディアURL: <a href="${data.mediaUrl}" target="_blank">${data.mediaUrl}</a></p>
+                            </div>
+                        `;
+                    } else {
+                        document.getElementById('mediaUrlDisplay').innerHTML = '';
+                    }
+
+                    document.getElementById('messageForm').reset();
+                } catch (error) {
+                    showStatus('messageResponse', `エラー: ${error.message}`, false);
+                    document.getElementById('mediaUrlDisplay').innerHTML = '';
+                } finally {
+                    submitButton.disabled = false;
+                    submitButton.textContent = '送信';
+                }
+            });
+
+            // ポーリング制御
+            document.getElementById('startPolling').addEventListener('click', async () => {
+                const aicoId = document.getElementById('pollingAicoId').value;
+                if (!aicoId) {
+                    showStatus('pollingStatus', 'AICO IDを入力してください', false);
+                    return;
+                }
+
+                try {
+                    const terminalId = await getTerminalId(aicoId);
+                    const startButton = document.getElementById('startPolling');
+                    const stopButton = document.getElementById('stopPolling');
+
+                    startButton.style.display = 'none';
+                    stopButton.style.display = 'inline-block';
+
+                    async function pollTerminal() {
+                        try {
+                            const token = localStorage.getItem('auth_token');
+                            const response = await fetchWithTimeout(`${API_URL}/terminals/${terminalId}/polling`, {
+                                method: 'POST',
+                                headers: {
+                                    'Authorization': `Bearer ${token}`
+                                }
+                            });
+
+                            if (!response.ok) {
+                                throw new Error('ポーリングに失敗しました');
+                            }
+
+                            const data = await response.json();
+                            showStatus('pollingStatus', 'ポーリング成功', true);
+                            showGreeting(data.greeting);
+                        } catch (error) {
+                            showStatus('pollingStatus', `エラー: ${error.message}`, false);
+                            showGreeting(null);
+                        }
+                    }
+
+                    await pollTerminal();
+                    pollingInterval = setInterval(pollTerminal, 60000);
+                } catch (error) {
+                    showStatus('pollingStatus', `エラー: ${error.message}`, false);
+                    showGreeting(null);
+                }
+            });
+
+            document.getElementById('stopPolling').addEventListener('click', () => {
+                clearInterval(pollingInterval);
+                document.getElementById('startPolling').style.display = 'inline-block';
+                document.getElementById('stopPolling').style.display = 'none';
+                showStatus('pollingStatus', 'ポーリングを停止しました', true);
+                showGreeting(null);
+            });
+
+            // SSE接続制御
+            let sseManager = null;
+
+            document.getElementById('startSSE').addEventListener('click', async () => {
+                const aicoId = document.getElementById('sseAicoId').value;
+                if (!aicoId) {
+                    const messageDiv = document.createElement('div');
+                    messageDiv.className = 'message error';
+                    messageDiv.textContent = 'AICO IDを入力してください';
+                    document.getElementById('forcedMessages').prepend(messageDiv);
+                    return;
+                }
+
+                try {
+                    const terminalId = await getTerminalId(aicoId);
+                    document.getElementById('startSSE').style.display = 'none';
+                    document.getElementById('stopSSE').style.display = 'inline-block';
+
+                    sseManager = new SSEManager(terminalId);
+                    sseManager.connect();
+                } catch (error) {
+                    const messageDiv = document.createElement('div');
+                    messageDiv.className = 'message error';
+                    messageDiv.textContent = `エラー: ${error.message}`;
+                    document.getElementById('forcedMessages').prepend(messageDiv);
+                }
+            });
+
+            document.getElementById('stopSSE').addEventListener('click', () => {
+                if (sseManager) {
+                    sseManager.close();
+                }
+                document.getElementById('startSSE').style.display = 'inline-block';
+                document.getElementById('stopSSE').style.display = 'none';
+            });
+
+            // 初期認証
+            authenticate().catch(error => {
+                console.error('Initial authentication failed:', error);
+            });
+
+            // トークン自動更新（20分ごと）
+            tokenRefreshInterval = setInterval(authenticate, 20 * 60 * 1000);
+        });
+
+        // クリーンアップ
+        window.addEventListener('beforeunload', () => {
+            clearInterval(pollingInterval);
+            clearInterval(tokenRefreshInterval);
+            if (eventSource) {
+                eventSource.close();
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,45 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* DatePicker customization */
+.react-datepicker {
+  @apply border border-gray-200 bg-white shadow-lg rounded-lg;
+}
+
+.react-datepicker__header {
+  @apply bg-gray-50 border-b border-gray-200 rounded-t-lg;
+}
+
+.react-datepicker__current-month {
+  @apply text-gray-700 font-semibold py-2;
+}
+
+.react-datepicker__day {
+  @apply text-gray-700 hover:bg-indigo-50 rounded-full;
+}
+
+.react-datepicker__day--selected,
+.react-datepicker__day--in-range {
+  @apply bg-indigo-500 text-white hover:bg-indigo-600;
+}
+
+.react-datepicker__day--keyboard-selected {
+  @apply bg-indigo-100 text-indigo-700;
+}
+
+.react-datepicker__day--in-selecting-range {
+  @apply bg-indigo-100;
+}
+
+.react-datepicker__navigation {
+  @apply top-3;
+}
+
+.react-datepicker__navigation--previous {
+  @apply left-3;
+}
+
+.react-datepicker__navigation--next {
+  @apply right-3;
+}
